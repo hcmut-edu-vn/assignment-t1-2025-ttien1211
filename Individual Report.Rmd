@@ -1,0 +1,266 @@
+---
+title: "Project Trimester 1 2025 - Individual Report - COMP1013"
+author: "Hoàng Ngọc Thuỷ Tiên - 22167438"
+date: "2025-04-04"
+output:
+  word_document: default
+  pdf_document: default
+---
+# **Question 1**
+```{r}
+library(ggplot2)
+library(dplyr)#for the purpose of data visualization of horsepower distribution
+
+# Load the datasets and use stringsAsFactors in this step to change the type of strings to factors
+engine_data <- read.csv("Engine.csv", stringsAsFactors = FALSE) 
+automobile_data <- read.csv("Automobile.csv", stringsAsFactors = FALSE)
+maintenance_data <- read.csv("Maintenance.csv", stringsAsFactors = FALSE)
+
+# Replace "?" with NA
+engine_data[engine_data == "?"] <- NA
+automobile_data[automobile_data == "?"] <- NA
+maintenance_data[maintenance_data == "?"] <- NA
+
+# Inspect the data structure
+str(engine_data)
+summary(engine_data) #present the data
+str(automobile_data)
+summary(automobile_data)  #present the data
+str(maintenance_data)
+summary(maintenance_data)  #present the data
+```
+```{r}
+# Convert categorical variables BodyStyles, FuelTypes, ErrorCodes (columns) to factors
+# Convert BodyStyles
+automobile_data$BodyStyles <- factor(automobile_data$BodyStyles,
+                                     levels = c("hardtop", "wagon", "sedan", "hatchback", "convertible"))
+
+# Convert FuelTypes
+engine_data$FuelType <- factor(engine_data$FuelType,
+                               levels = c("diesel", "gas"))
+
+# Convert ErrorCodes
+maintenance_data$ErrorCodes <- factor(maintenance_data$ErrorCodes,
+                                      levels = c(0, 1, -1),
+                                      labels = c("No Error", "Engine Failure", "Other Component Failure"))
+```
+
+
+```{r}
+# Replace missing values NA in Horsepower column with the mean Horsepower
+engine_data$Horsepower <- as.numeric(as.character(engine_data$Horsepower))  # convert Horsepower column to numeric
+mean_horsepower <- mean(engine_data$Horsepower, na.rm = TRUE)  # Calculate the mean of the Horsepower column
+engine_data$Horsepower[is.na(engine_data$Horsepower)] <- mean_horsepower  # Replace NA values with mean values
+```
+
+```{r}
+# Plot histogram of Horsepower distribution
+ggplot(engine_data, aes(x = Horsepower)) +
+  geom_histogram(binwidth = 10, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution of Horsepower",
+       x = "Horsepower",
+       y = "Frequency") +
+  theme_minimal()
+```
+
+# **Question 2** 
+```{r}
+engine_data$NumCylinders <- factor(engine_data$NumCylinders, 
+                                   levels = c("two", "three", "four", "five", "six", "eight", "twelve"),
+                                   ordered = TRUE) # a categorical variable with increasing order
+
+# Analyze Horsepower distribution across NumCylinders
+ggplot(engine_data, aes(x = Horsepower, fill = NumCylinders)) +
+  geom_histogram(binwidth = 10, position = "identity", alpha = 0.5, color = "black") +
+  labs(title = "Horsepower Distribution Across Number of Cylinders",
+       x = "Horsepower",
+       y = "Count") +
+  theme_minimal(base_size = 13) +
+  scale_fill_brewer(palette = "Set2")
+```
+#Explain the findings
++ **Findings from the Horsepower Distribution Across Number of Cylinders**
+A direct relationship exists between the number of cylinders and horsepower: **larger cylinders produce more horsepower than smaller cylinders**. Most cars on the market have **four cylinders**, with horsepower values ranging from 50-150. However, **horsepower values become more dispersed for cars with 5 to 12 cylinders**, reaching higher levels around 150-200 and even close to 300. However, there are very few cars with high-cylinder engines. One can see a strange point in the chart: some cars have 6-cylinder engines but have relatively lower horsepower than 5-cylinders. It can be concluded that most cars on the market belong to the small or medium-engine segment. The horsepower groups from 201 to 300 have low frequencies, indicating that the number of cars with high power is still small. However, there are some exceptions where the car has high cylinders but low horsepower.
+```{r}
+# Categorize EngineSize into groups because EngineSize is continuous numerical variable
+engine_data$EngineSizeGroup <- cut(engine_data$EngineSize, 
+                                   breaks = c(60, 100, 200, 300, Inf),
+                                   labels = c("60-100", "101-200", "201-300", "301+"),
+                                   right = TRUE,
+                                   include.lowest = TRUE)
+
+engine_data$EngineSizeGroup <- factor(engine_data$EngineSizeGroup, 
+                                      levels = c("60-100", "101-200", "201-300", "301+"),
+                                      ordered = TRUE) # helps the chart display in the correct order from small to large
+
+# Analyze Horsepower distribution across EngineSize groups
+ggplot(engine_data, aes(x = Horsepower, fill = EngineSizeGroup)) +
+  geom_histogram(binwidth = 10, position = "identity", alpha = 0.5, color = "black") +
+  labs(title = "Horsepower Distribution Across Engine Size Groups",
+       x = "Horsepower",
+       y = "Count") +
+  theme_minimal(base_size = 13) +
+  scale_fill_brewer(palette = "Set3")
+```
+#### Explain the findings
++ **Findings from the Horsepower Distribution Across Engine Size Groups**
+The second chart classifies vehicles by engine power group. Most of the engine sizes of most vehicles on the market will be in the 60-100 and 101-200 groups with low to medium power. These are vehicles with moderate horsepower performance. Vehicles with larger engines will have more horsepower.
+-> When the engine has more horsepower, it will accelerate faster. Conversely, engines with lower horsepower will be more fuel efficient but accelerate slower.
+
+#### Conclusion
+Horsepower, engine size and cylinders directly reflect the vehicle's performance. **The more cylinders and engine size, the higher the horsepower**. In the mass market, *4-cylinder engines dominate* with an *average power range of 101-200 HP*. Meanwhile, vehicles with a high number of cylinders, from 6 to 12, and power of over 200 HP are less common.
+
+# **Question 3**
+```{r}
+library(stringr)
+#Combine maintenance_data with automobile_data to get Engine Model
+maint_auto <- maintenance_data %>%
+  left_join(automobile_data[, c("PlateNumber", "EngineModel")], by = "PlateNumber")
+
+#Attach FuelTypes to the data, based on the EngineModel
+maint_full <- maint_auto %>%
+  left_join(engine_data[, c("EngineModel", "FuelTypes")], by = "EngineModel")
+
+#Filter for engine-related troubles
+engine_troubles <- maint_full %>%
+  filter(
+    ErrorCodes == 1 |
+    str_detect(tolower(Troubles), "cam shaft|crank shaft|cylinders|ecu's power|fans|ignition|ignition \\(finding\\)|noise \\(finding\\)|o2 sensors|oil filter|pedals|pressure sensors|stroke|suspected battery|temperature sensors|valve clearance") #detect keywords that are suspicious of engine failure in the error description
+  ) %>%
+  filter(Troubles != "No error") %>%
+  mutate(Troubles = str_trim(str_to_title(Troubles)))
+
+#Top 5 most common troubles for Diesel
+top5_diesel_only <- engine_troubles %>%
+  filter(FuelTypes == "diesel") %>%
+  group_by(Troubles) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 5)
+
+print("Top 5 Engine Troubles for Diesel:")
+print(top5_diesel_only)
+```
+
+```{r}
+#Top 5 most common troubles for Gas
+top5_gas_only <- engine_troubles %>%
+  filter(FuelTypes == "gas") %>%
+  group_by(Troubles) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 5)
+
+print("Top 5 Engine Troubles for Gas:")
+print(top5_gas_only)
+```
+
+```{r}
+#Attach fuel labels before combining and visualizing the data
+top5_diesel_only <- top5_diesel_only %>%
+  mutate(FuelType = "Diesel")
+top5_gas_only <- top5_gas_only %>%
+  mutate(FuelType = "Gas")
+#Combine for plotting
+top5_combined <- bind_rows(top5_diesel_only, top5_gas_only) # Combine data of 2 vehicle groups into 1 table
+
+#Plot for comparision
+ggplot(top5_combined, aes(x = reorder(Troubles, Count), y = Count, fill = FuelType)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9)) +
+  geom_text(aes(label = Count), position = position_dodge(width = 0.9), vjust = -0.3, size = 3.5) +
+  labs(
+    title = "Top 5 Engine Troubles: Diesel vs Gas",
+    x = "Engine Troubles",
+    y = "Number of Occurrences",
+    fill = "Fuel Type"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+#### Elaborate on findings
+Based on the chart, it can be seen that **Gasoline-powered vehicles have more frequent failures than diesel-powered vehicles**. In particular, Cylinders, Ignition and Noise are the most frequently occurrence parts in Gas, with Cylinders appearing 36 times in Gas vehicles and only 3 cases in Diesel.
+
+Diesel vehicles have fewer errors, often occurring sporadically in the Cam Shaft, Crank Shaft, and Stroke parts. However, errors in the Cam Shaft or Crank Shaft are serious errors related to power transmission, as well as the parts that ensure the engine's operating cycle takes place normally. This shows that **although diesel vehicles rarely make errors, they will be serious errors if they do occur**. Meanwhile, *Gas vehicles tend to have minor faults frequently*.
+
+
+# **Question 4**
+```{r}
+library(tidyverse)
+
+# Normalize column names by cleaning up column names to avoid errors when calling column names with extra spaces
+colnames(maintenance_data) <- trimws(colnames(maintenance_data))
+
+# Clean and standardize Methods
+maintenance_data <- maintenance_data %>%
+  mutate(
+    ErrorCodes = str_trim(tolower(as.character(ErrorCodes))),
+    Troubles = tolower(as.character(Troubles)),
+    Methods = str_to_title(str_trim(as.character(Methods)))  # Normalize for plotting
+  )
+
+# Convert error descriptions to numeric and non-matching values will be assigned NA 
+maintenance_data <- maintenance_data %>%
+  mutate(ErrorCodes = case_when(
+    ErrorCodes %in% c("no error", "0") ~ 0,
+    ErrorCodes %in% c("engine failure", "engine fails", "1") ~ 1,
+    ErrorCodes %in% c("other component failure", "other vehicle component fails", "-1") ~ -1,
+    TRUE ~ NA_real_
+  ))
+
+# Filter vehicles that had trouble and suspected
+trouble_vehicles <- maintenance_data %>%
+  filter(
+    ErrorCodes != 0 | str_detect(Troubles, "suspected")
+  )
+
+#Make sure each value appears only once before performing the join and prevent many-to-many relationship warnings 
+automobile_data <- automobile_data %>% distinct(PlateNumber, .keep_all = TRUE)
+engine_data <- engine_data %>% distinct(EngineModel, .keep_all = TRUE)
+
+
+#Merge data based on PlateNumber and EngineModel keys 
+merged_data <- trouble_vehicles %>%
+  left_join(automobile_data, by = "PlateNumber") %>%
+  left_join(engine_data, by = "EngineModel")
+
+# Clean and normalize BodyStyles
+merged_data <- merged_data %>%
+  mutate(BodyStyles = str_to_title(str_trim(as.character(BodyStyles))))
+
+# Force factor levels to include all method types
+merged_data$Methods <- factor(
+  merged_data$Methods,
+  levels = c("Adjustment", "Replacement", "Urgent Care")
+)
+
+# Also factor BodyStyles for consistent x-axis
+merged_data$BodyStyles <- as.factor(merged_data$BodyStyles)
+
+# Plot
+ggplot(merged_data, aes(x = BodyStyles, fill = Methods)) +
+  geom_bar(position = "dodge") +
+  labs(title = "BodyStyles might influence the maintenance methods",
+       x = "BodyStyles", y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+#### Findings
+Based on the chart, it can be seen that **Sedans and Hatchbacks are the two most common body styles with troubles**, with the maintenance method being Replacement. Meanwhile, the Convertible, Hardtop, and Wagon models have fewer problems. The Urgent Care maintenance method is very low frequency and does not occur in Convertible body styles.
+
+```{r}
+# Plot FuelTypes vs Maintenance Methods 
+if (nrow(merged_data) > 0) {
+  ggplot(merged_data, aes(x = FuelTypes, fill = Methods)) +
+    geom_bar(position = "dodge") +
+    labs(title = "FuelTypes might influence the maintenance methods",
+         x = "FuelTypes", y = "Count") +
+    theme_minimal()
+} else {
+  cat("No data available to plot FuelTypes.\n")
+}
+```
+#### Findings
+Based on the chart above, it can be seen that **gasoline vehicles have the most significant problems**, leading to high replacements and adjustments. It is entirely *consistent with the results found in Question 3*, as gasoline vehicles have more frequent problems than diesel vehicles. Meanwhile, diesel vehicles rarely have problems and no urgent care cases.
+
+
